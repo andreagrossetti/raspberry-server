@@ -1,16 +1,12 @@
 {
   "name": "raspberry-server",
   "version": "1.0.0",
-  "description": "server to establish a connection with visup cloud and receive instructions.",
   "main": "index.js",
-  "repository": "https://gitlab.com/visup/friulinox/demo-eurotech/raspberry-server",
-  "author": "Andrea Grossetti",
+  "repository": "https://github.com/andreagrossetti/raspberry-server.git",
+  "author": "andrea@visup.it",
   "license": "MIT",
-  "private": true,
   "dependencies": {
-    "fs": "^0.0.1-security",
-    "node-ssh": "^7.0.0",
-    "path": "^0.12.7",
-    "phoenix-channels": "^1.0.0"
+    "phoenix-channels": "^1.0.0",
+    "ssh2": "^0.8.7"
   }
 }
