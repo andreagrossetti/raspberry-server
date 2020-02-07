@@ -4,19 +4,20 @@ const https = require('https');
 const fs = require('fs');
 const { Client } = require('ssh2');
 const { readFileSync } = require('fs')
+const { getLogger } = require('./logger');
 
 const connectSSH = async (successCallback, errorCallback) => {
   this.gatewayConnector = new GatewayConnector();
   try {
     await this.gatewayConnector.createNewKey();
   } catch (error) {
-    console.error("Error creating rsa key: ", error);
+    getLogger().error("Error creating rsa key: ", error);
     return false;
   }
   const onError = () => {
     errorCallback.call()
     setTimeout(() => {
-      console.log('SSH connection failed, reconnecting...')
+      getLogger().info('SSH connection failed, reconnecting...')
       connectSSH(successCallback, errorCallback);
     }, 5000)
   }
@@ -35,7 +36,7 @@ const downloadFile = (url, options) => {
     } = options;
     const filePath = `${folder}/${fileName}`;
     if (!downloadIfAlreadyExists && fs.existsSync(filePath)) {
-      console.log(`${filePath} already exists`)
+      getLogger().info(`${filePath} already exists`)
       resolve(filePath);
     } else {
       if (!fs.existsSync(folder)) {
@@ -45,7 +46,7 @@ const downloadFile = (url, options) => {
       https.get(url, response => {
         response.pipe(file);
         resolve(filePath);
-        console.log(`Downloaded ${url}`)
+        getLogger().info(`Downloaded ${url}`)
       }).on('error', error => {
         reject(error)
       });
@@ -53,7 +54,7 @@ const downloadFile = (url, options) => {
   })
 }
 
-const flashGateway = async (esfRpmUrl = 'esf-reliagate-20-25-6.1.0-1.corei7_64.rpm', snapshotUrl = 'https://visup-misc.s3-eu-west-1.amazonaws.com/friulinox-snapshots/AB02.xml', packages = []) => {
+const flashGateway = async (esfRpmUrl = 'esf-reliagate-20-25-5.2.0-1.corei7_64.rpm', snapshotUrl = 'https://visup-misc.s3-eu-west-1.amazonaws.com/friulinox-snapshots/AB02.xml', packages = []) => {
   try {
     const snapshotPath = await downloadFile(snapshotUrl, { folder: './snapshots' })
     const esfPath = await downloadFile(esfRpmUrl, { folder: './esf' })
@@ -62,7 +63,7 @@ const flashGateway = async (esfRpmUrl = 'esf-reliagate-20-25-6.1.0-1.corei7_64.r
     }))
     await this.gatewayConnector.installEsf(esfPath, snapshotPath, packagesPaths)
   } catch (error) {
-    console.error(error)
+    getLogger().error(error)
   }
 }
 
@@ -82,11 +83,11 @@ const init = async () => {
 
   // Listen for backend flashGatewayRequest and inform gateway connector
   wsc.eventEmitter.on('flashGatewayRequest', async ({ esfRpmUrl, snapshotUrl, packages }) => {
-    console.log('flashGatewayRequest event received')
+    getLogger().info('flashGatewayRequest event received')
     try {
       flashGateway(esfRpmUrl, snapshotUrl, packages);
     } catch (error) {
-      console.error(error)
+      getLogger().error(error)
     }
   })
 

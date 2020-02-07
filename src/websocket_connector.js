@@ -1,7 +1,8 @@
 const { Socket } = require('phoenix-channels')
 const { exec } = require("child_process");
 const EventEmitter = require('events');
-const VISUP_CLOUD_HOST = '192.168.178.148:4001';
+const VISUP_CLOUD_HOST = '192.168.43.189:4001';
+const { getLogger } = require('./logger');
 
 class WebSocketConnector extends EventEmitter {
   constructor() {
@@ -9,7 +10,7 @@ class WebSocketConnector extends EventEmitter {
     this.channel = undefined;
     this.eventEmitter = new EventEmitter();
     // setTimeout(() => {
-    //   console.log('emitting')
+    //   getLogger().info('emitting')
     //   this.emitFlashGatewayEvent();
     // }, 5000)
   }
@@ -37,7 +38,7 @@ class WebSocketConnector extends EventEmitter {
     try {
       await this.channel.push('gateway_info', { body: body })
     } catch (error) {
-      console.error(error);
+      getLogger().error(error);
     }
   }
 
@@ -48,11 +49,11 @@ class WebSocketConnector extends EventEmitter {
 
     let channel = socket.channel(`serial:${serial}`)
     channel.join()
-      .receive("ok", resp => { console.log("Joined successfully", resp) })
-      .receive("error", resp => { console.log("Unable to join", resp) })
+      .receive("ok", resp => { getLogger().info("Joined successfully", resp) })
+      .receive("error", resp => { getLogger().info("Unable to join", resp) })
 
     channel.on("new_msg", payload => {
-      console.log('new msg', payload);
+      getLogger().info('new msg', payload);
     })
     channel.on("flash_gateway", payload => {
       // TODO: try catch

@@ -7,6 +7,10 @@
   "license": "MIT",
   "dependencies": {
     "phoenix-channels": "^1.0.0",
-    "ssh2": "^0.8.7"
+    "ssh2": "^0.8.7",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^3.7.5"
   }
 }

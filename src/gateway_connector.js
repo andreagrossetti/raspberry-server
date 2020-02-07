@@ -2,6 +2,7 @@ const { readFileSync } = require('fs')
 const { Client } = require('ssh2');
 const { promisify } = require('util');
 const exec = promisify(require('child_process').exec);
+const { getLogger } = require('./logger');
 
 class GatewayConnector {
   constructor() {
@@ -15,7 +16,7 @@ class GatewayConnector {
   createNewKey = () => {
     return new Promise(async (resolve, reject) => {
       try {
-        const { stdout, stderr } = await exec('bash ssh-keygen.bash');
+        const { stdout, stderr } = await exec('bash ./src/scripts/ssh-keygen.bash');
         if (stderr) {
           reject(stderr);
         } else {
@@ -55,19 +56,19 @@ class GatewayConnector {
       const conn = new Client();
       conn.on('end', () => {
         // options.connectionEndCallback.call(this)
-        console.log('SSH disconnected');
+        getLogger().info('SSH disconnected');
       })
       conn.on('error', (error) => {
         options.onError.call(this)
-        console.error('SSH Error', error);
+        getLogger().error('SSH Error', error);
       })
       conn.on('ready', async () => {
-        console.log('SSH connected')
+        getLogger().info('SSH connected')
         this.conn = conn;
         options.onSuccess();
         try {
           await this.sftpFileTransfer(conn, '.ssh/id_rsa.pub', '.ssh/authorized_keys')
-          console.log('Copied ssh certificate on gateway')
+          getLogger().info('Copied ssh certificate on gateway')
           resolve();
         } catch (error) {
           reject(error)
@@ -106,18 +107,27 @@ class GatewayConnector {
     return new Promise(async (resolve, reject) => {
       const rpmPackageName = await this.execToPromise('rpm -qa | grep esf')
       if (!rpmPackageName) {
-        console.log("For some reason there is no esf rpm package already installed")
+        getLogger().warn("For some reason there is no esf rpm package already installed")
       } else {
         try {
-          console.log(`cmd: rpm -e ${rpmPackageName.trim()}`)
+          getLogger().info(`cmd: rpm -e ${rpmPackageName.trim()}`)
           await this.execToPromise(`rpm -e ${rpmPackageName.trim()}`)
         } catch (error) {
           // TODO: this is probably a warning, filter only warnings and throw error otherwise
-          console.log(error);
+          getLogger().error(error);
         }
       }
       try {
-        console.log('cmd: rm -fr /opt/eurotech/esf*')
+        // Turn led 1 and 2 amber
+        await this.execToPromise('echo 0 > /sys/class/leds/led1-green/brightness')
+        await this.execToPromise('echo 0 > /sys/class/leds/led2-green/brightness')
+        await this.execToPromise('echo 1 > /sys/class/leds/led1-amber/brightness')
+        await this.execToPromise('echo 1 > /sys/class/leds/led2-amber/brightness')
+      } catch {
+        getLogger().error('There was a problem turning leds amber')
+      }
+      try {
+        getLogger().info('cmd: rm -fr /opt/eurotech/esf*')
         await this.execToPromise('rm -fr /opt/eurotech/esf*')
         resolve();
       } catch (error) {
@@ -131,20 +141,27 @@ class GatewayConnector {
       try {
         const esfFleName = esfPath.substring(esfPath.lastIndexOf('/') + 1);
         const snapshotName = snapshotPath.substring(snapshotPath.lastIndexOf('/') + 1);
+        await this.execToPromise('rm -rf /tmp/esf*')
         await this.sftpFileTransfer(this.conn, esfPath, `/tmp/${esfFleName}`);
         await this.sftpFileTransfer(this.conn, snapshotPath, `/tmp/${snapshotName}`);
         packagesPath.forEach(async packagePath => {
           const packagesName = packagePath.substring(packagePath.lastIndexOf('/') + 1);
           await this.sftpFileTransfer(this.conn, packagePath, `/tmp/${packagesName}`);
         })
-        console.log('Copied ESF rpm and snapshot to gateway')
-        // Uninstall olf ESF
+        // await this.execToPromise('org.eclipse.kura.configuration.remote=file\:/opt/eclipse/kura/kura/packages/org.eclipse.kura.configuration.remote_1.0.0.dp')
+        getLogger().info('Copied ESF rpm and snapshot to gateway')
+
+        await this.sftpFileTransfer(this.conn, 'src/scripts/update_esf.bash', '/tmp/update_esf.bash');
+        const packagesParams = packagesPath.map(packagePath => {
+          return `-p ${packagePath.substring(packagePath.lastIndexOf('/') + 1)}`
+        }).join(' ')
         try {
-          await this.removeEsfVersion();
-          console.log('resolving')
+          getLogger().info(`Transfered bash file: bash /tmp/update_esf.bash ${packagesParams} -e /tmp/${esfFleName}`)
+          const installScriptResult = await this.execToPromise(`bash /tmp/update_esf.bash ${packagesParams} -e /tmp/${esfFleName} -s /tmp/${snapshotName}`)
+          getLogger().info(installScriptResult);
           resolve()
         } catch (error) {
-          console.log('rejecting')
+          getLogger().info('rejecting')
           reject(error)
         }
       } catch (error) {
@@ -171,13 +188,12 @@ class GatewayConnector {
     return new Promise(async (resolve, reject) => {
       // const result = await ssh.execCommand('rpm -qa | grep esf')
       try {
-        const result = await this.execToPromise('rpm -qa | grep esf')
-        const rawString = result;
+        const rawString = await this.execToPromise('rpm -qa | grep esf');
         const matchArray = rawString.match(/[0-9]\.[0-9]\.[0-9]/)
         if (matchArray && matchArray.length === 1) {
-          resolve(matchArray[0])
+          return resolve(matchArray[0])
         }
-        console.error('Error getting ESF version: not found')
+        getLogger().error('Error getting ESF version: not found')
         resolve()
       } catch (error) {
         reject(`Error getting ESF version: ${error} `)
@@ -185,16 +201,12 @@ class GatewayConnector {
     })
   }
 
-  // defaultConnect(connectionEndCallback, connectionErrorCallback) {
-  //   return this.connect('172.16.0.1', 'root', 'eurotech', null, connectionEndCallback, connectionErrorCallback)
-  // }
-
   closeSSHConnection() {
     this.conn.end();
   }
 
   handleError(error) {
-    console.error(error);
+    getLogger().error(error);
     this.closeSSHConnection();
   }
 
@@ -213,21 +225,6 @@ class GatewayConnector {
       this.handleError(error)
     }
   }
-
-
-
-  // async init() {
-  //   try {
-  //     await this.defaultConnect();
-  //     await this.getGatewayInfo();
-  //     try {
-  //     } catch (error) {
-  //       this.handleError(error)
-  //     }
-  //   } catch (error) {
-  //     this.handleError(error)
-  //   }
-  // }
 }
 
 module.exports = {
