@@ -1,16 +1,28 @@
 {
   "name": "raspberry-server",
+  "scripts": {
+    "tsc": "tsc",
+    "start": "ts-node-dev --respawn --transpileOnly ./src/app.ts",
+    "build": "tsc"
+  },
   "version": "1.0.0",
   "main": "index.js",
   "repository": "https://github.com/andreagrossetti/raspberry-server.git",
   "author": "andrea@visup.it",
   "license": "MIT",
   "dependencies": {
+    "fs": "^0.0.1-security",
+    "lodash": "^4.17.15",
     "phoenix-channels": "^1.0.0",
     "ssh2": "^0.8.7",
     "winston": "^3.2.1"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.149",
+    "@types/node": "^13.7.0",
+    "@types/ssh2": "^0.5.39",
+    "ts-node-dev": "^1.0.0-pre.44",
+    "tslint": "^6.0.0",
     "typescript": "^3.7.5"
   }
 }

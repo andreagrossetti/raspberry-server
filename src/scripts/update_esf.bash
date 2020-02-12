@@ -8,7 +8,6 @@ DPA_FILE_PATH="/opt/eurotech/esf/data/dpa.properties"
 SNAPSHOT=""
 SNAPSHOTS_DIR="/opt/eurotech/esf/user/snapshots/"
 
-POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
     key="$1"
